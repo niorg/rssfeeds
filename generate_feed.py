@@ -5,39 +5,72 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 import xml.dom.minidom
 import re
 import time
+import locale
+
+# Set Dutch locale for parsing month names, adjust as necessary:
+try:
+    locale.setlocale(locale.LC_TIME, 'nl_NL.UTF-8')
+except:
+    # If not available, fallback
+    locale.setlocale(locale.LC_TIME, 'nl_NL')
 
 SITE_URL = 'https://www.sparta-rotterdam.nl/'
 
+def parse_nl_datetime(dt_str):
+    """Parse '27 juni 2025 - 17:00' into datetime object."""
+    # Remove any extra spaces and take only the needed part
+    match = re.search(r'(\d+) (\w+) (\d{4})\s*-\s*(\d{2}):(\d{2})', dt_str)
+    if match:
+        day, month, year, hour, minute = match.groups()
+        month = month.lower()
+        # Map Dutch month names to numbers if locale failed
+        maanden = {
+            'januari': 1, 'februari': 2, 'maart': 3, 'april': 4, 'mei': 5, 'juni': 6,
+            'juli':7, 'augustus':8, 'september':9, 'oktober':10, 'november':11, 'december':12
+        }
+        month_nr = maanden.get(month, 1)
+        return datetime(int(year), month_nr, int(day), int(hour), int(minute))
+    return datetime.now()
+
 def fetch_article_details(url):
-    """Visit the article URL and return (published_date, content_html)"""
+    """Visit the article URL and return (published_date, main_html_content)"""
     try:
         resp = requests.get(url, timeout=10)
         soup = BeautifulSoup(resp.text, 'html.parser')
-        
-        # Adjust selectors below as needed!
-        # Example for WordPress/themes:
-        date_elem = soup.find('time')
-        if date_elem and (date_elem.has_attr('datetime') or date_elem.text.strip()):
-            if date_elem.has_attr('datetime'):
-                pub_date_str = date_elem['datetime']
-            else:
-                pub_date_str = date_elem.text.strip()
-            try:
-                pub_date = datetime.fromisoformat(pub_date_str.replace('Z', '+00:00'))
-            except:
-                pub_date = datetime.now()
+
+        article = soup.find('article', class_='single')
+        if not article:
+            return datetime.now(), ""
+
+        # Extract date
+        date_span = article.find('span', class_='datetime')
+        if date_span:
+            pub_date = parse_nl_datetime(date_span.text.strip())
         else:
             pub_date = datetime.now()
 
-        # Content: try both common names, tweak as needed
-        content_elem = soup.find('div', class_='entry-content') or soup.find('div', class_='content')
-        if content_elem:
-            content_html = str(content_elem)
-        else:
-            # Fallback to whole page
-            content_html = soup.get_text()
-        
-        return pub_date, content_html
+        # Extract only p, div.gallery, img, em in order, skip <style> etc
+        body_html = ""
+        for el in article.find_all(['p', 'div', 'img', 'em'], recursive=False):
+            # Only include the gallery divs and paragraphs, not <style> or <script>
+            if el.name == 'div' and not el.get('class') or 'gallery' not in ' '.join(el.get('class', [])):
+                continue
+            if el.name == 'img':
+                body_html += str(el)
+            else:
+                body_html += str(el)
+
+        # Fallback: if above is empty, get all p/galley inside article
+        if not body_html:
+            wanted = []
+            for x in article.find_all(['p', 'div'], recursive=True):
+                if x.name == 'div' and x.get('class') and 'gallery' in x['class']:
+                    wanted.append(str(x))
+                if x.name == 'p':
+                    wanted.append(str(x))
+            body_html = "".join(wanted)
+
+        return pub_date, body_html
 
     except Exception as e:
         print(f"Error scraping {url}: {e}")
@@ -48,7 +81,6 @@ def fetch_articles():
     soup = BeautifulSoup(resp.text, 'html.parser')
     articles = []
 
-    # Limit to first 8 for speed
     for art in soup.select('article.news_item')[:8]:
         a = art.find('a', class_='item_link')
         title = art.find('h3')
@@ -57,7 +89,7 @@ def fetch_articles():
         if not link.startswith('http'):
             link = SITE_URL.rstrip('/') + '/' + link.lstrip('/')
 
-        # Try to get image URL from style
+        # Try to get image URL from style if desired
         img_url = ""
         if 'style' in art.attrs:
             match = re.search(r'url\(([^)]+)\)', art['style'])
@@ -65,15 +97,16 @@ def fetch_articles():
                 img_url = match.group(1)
 
         print(f"Fetching details for: {link}")
-        pub_date, content_html = fetch_article_details(link)
-        # For output, RFC822 date, which RSS readers expect
+        pub_date, article_html = fetch_article_details(link)
         pub_date_rss = pub_date.strftime('%a, %d %b %Y %H:%M:%S +0100')
 
-        # Compose article description with optional image and content
-        description = label.text.strip() if label else ""
+        # Compose description (label + optional image + article content)
+        description = ""
+        if label:
+            description += f"<strong>{label.text.strip()}</strong><br>"
         if img_url:
-            description += f'<br><img src="{img_url}">'
-        description += content_html
+            description += f'<img src="{img_url}"><br>'
+        description += article_html
 
         articles.append({
             'title': title.text.strip() if title else '',
@@ -82,7 +115,7 @@ def fetch_articles():
             'pubDate': pub_date_rss,
         })
 
-        time.sleep(0.5)  # Be polite to server!
+        time.sleep(0.7)  # Be polite
 
     return articles
 
