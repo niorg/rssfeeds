@@ -22,10 +22,17 @@ jobs:
       uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
 
     - name: Generate RSS feed
+      working-directory: sparta_main
       run: |
         pip install -r requirements.txt
         python generate_feed.py
  
+    - name: Generate RSS feed
+      working-directory: sparta_kids
+      run: |
+        pip install -r requirements.txt
+        python generate_feed.py
+
     - name: Setup Pages
       uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5.0.0
 
