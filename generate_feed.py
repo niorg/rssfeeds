@@ -113,27 +113,24 @@ def fetch_articles():
     return articles
 
 def build_rss(articles):
-    rss = Element('rss')
-    rss.set('version', '2.0')
-    channel = SubElement(rss, 'channel')
-
-    title = SubElement(channel, 'title')
-    title.text = "Sparta Rotterdam nieuws (onofficieel)"
-    link = SubElement(channel, 'link')
-    link.text = SITE_URL
-    description = SubElement(channel, 'description')
-    description.text = "Ongeofficieel RSS-nieuwsfeed voor Sparta Rotterdam"
+    from xml.sax.saxutils import escape
+    rss = ['<?xml version="1.0" encoding="UTF-8"?>',
+           '<rss version="2.0"><channel>',
+           '<title>Sparta Rotterdam nieuws (onofficieel)</title>',
+           f'<link>{SITE_URL}</link>',
+           '<description>Ongeofficieel RSS-nieuwsfeed voor Sparta Rotterdam</description>']
 
     for article in articles:
-        item = SubElement(channel, 'item')
-        for key, value in article.items():
-            elem = SubElement(item, key)
-            elem.text = value
+        rss.append("<item>")
+        rss.append(f"<title>{escape(article['title'])}</title>")
+        rss.append(f"<link>{escape(article['link'])}</link>")
+        rss.append(f"<pubDate>{escape(article['pubDate'])}</pubDate>")
+        # Insert HTML as CDATA
+        rss.append(f"<description><![CDATA[{article['description']}]]></description>")
+        rss.append("</item>")
 
-    raw_xml = tostring(rss, 'utf-8')
-    dom = xml.dom.minidom.parseString(raw_xml)
-    pretty_xml = dom.toprettyxml(indent="  ")
-    return pretty_xml
+    rss.append("</channel></rss>")
+    return "\n".join(rss)
 
 if __name__ == "__main__":
     articles = fetch_articles()
