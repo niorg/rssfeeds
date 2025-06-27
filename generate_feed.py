@@ -42,26 +42,18 @@ def fetch_article_details(url):
         else:
             pub_date = datetime.now()
 
-        # Extract only p, div.gallery, img, em in order, skip <style> etc
         body_html = ""
-        for el in article.find_all(['p', 'div', 'img', 'em'], recursive=False):
-            # Only include the gallery divs and paragraphs, not <style> or <script>
-            if el.name == 'div' and not el.get('class') or 'gallery' not in ' '.join(el.get('class', [])):
+        # We skip the title and date; we DO want everything else, and in correct order!
+        for el in article.find_all(['p', 'div', 'img', 'em'], recursive=True):
+            # Skip style/script completely
+            if el.name in ('style', 'script'):
                 continue
-            if el.name == 'img':
-                body_html += str(el)
-            else:
-                body_html += str(el)
-
-        # Fallback: if above is empty, get all p/galley inside article
-        if not body_html:
-            wanted = []
-            for x in article.find_all(['p', 'div'], recursive=True):
-                if x.name == 'div' and x.get('class') and 'gallery' in x['class']:
-                    wanted.append(str(x))
-                if x.name == 'p':
-                    wanted.append(str(x))
-            body_html = "".join(wanted)
+            # Only allow gallery divs for "div", not every div
+            if el.name == "div":
+                if "gallery" in el.get("class", []):
+                    body_html += str(el)
+                continue
+            body_html += str(el)
 
         return pub_date, body_html
 
