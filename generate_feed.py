@@ -7,13 +7,6 @@ import re
 import time
 import locale
 
-# Set Dutch locale for parsing month names, adjust as necessary:
-try:
-    locale.setlocale(locale.LC_TIME, 'nl_NL.UTF-8')
-except:
-    # If not available, fallback
-    locale.setlocale(locale.LC_TIME, 'nl_NL')
-
 SITE_URL = 'https://www.sparta-rotterdam.nl/'
 
 def parse_nl_datetime(dt_str):
