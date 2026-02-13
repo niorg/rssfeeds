@@ -67,9 +67,19 @@ class SpartaRotterdamRSSGenerator:
 
             return articles
             
+        except cloudscraper.exceptions.CloudflareChallengeError as e:
+            print(f"Cloudflare challenge failed: {e}")
+            print(f"The Sparta Rotterdam website is protected by Cloudflare's advanced bot protection.")
+            print(f"This protection cannot be bypassed with simple HTTP requests.")
+            print(f"\nPossible workarounds:")
+            print(f"  1. Use a browser extension to manually generate the RSS feed")
+            print(f"  2. Contact the website administrator to request an official RSS feed")
+            print(f"  3. Use a headless browser solution (Selenium/Playwright) with undetected-chromedriver")
+            return []
         except Exception as e:
-            # Check if this is a Cloudflare protection issue
-            if '403' in str(e) or 'Forbidden' in str(e):
+            # Check if this is a 403 HTTP error
+            error_str = str(e)
+            if '403' in error_str or 'Forbidden' in error_str:
                 print(f"Access denied (403 Forbidden).")
                 print(f"The Sparta Rotterdam website is protected by Cloudflare's advanced bot protection.")
                 print(f"This protection cannot be bypassed with simple HTTP requests.")
