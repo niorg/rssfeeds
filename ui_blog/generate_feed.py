@@ -31,8 +31,9 @@ class UIBlogRSSGenerator:
         try:
             # Handle ISO format with timezone (e.g., "2026-02-11T10:37:33.074Z")
             if 'T' in date_str:
-                # Remove milliseconds and timezone
-                date_str = date_str.split('.')[0] if '.' in date_str else date_str.replace('Z', '')
+                # Remove timezone suffix (Z) and milliseconds
+                date_str = date_str.rstrip('Z')
+                date_str = date_str.split('.')[0]
                 return datetime.fromisoformat(date_str)
         except ValueError:
             pass
