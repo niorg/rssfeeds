@@ -35,17 +35,17 @@ class KiaUpdateRSSGenerator:
         soup = BeautifulSoup(html_content, 'html.parser')
         updates = []
 
-        # Find the table container
-        table_container = soup.find('div', class_='tbl')
+        # Find the table element (new site structure uses actual <table>)
+        table = soup.find('table')
 
-        if not table_container:
-            print("Could not find the table container")
+        if not table:
+            print("Could not find the table element")
             return updates
 
-        # Find all update rows (they have class 'row' and 'body')
-        update_rows = table_container.find_all('div', class_=re.compile(r'row.*body'))
-
-        for row in update_rows:
+        # Find all update rows (skip the header row)
+        rows = table.find_all('tr')
+        
+        for row in rows[1:]:  # Skip header row
             update = self.extract_update_info(row)
             if update:
                 updates.append(update)
@@ -56,33 +56,34 @@ class KiaUpdateRSSGenerator:
         """Extract information from a single update row"""
         update = {}
 
-        # Extract columns
-        cols = row.find_all('div', class_=re.compile(r'col-'))
+        # Extract cells (th or td)
+        cells = row.find_all(['th', 'td'])
 
-        if len(cols) >= 3:
-            # Category (first column)
-            category = cols[0].get_text(strip=True)
+        if len(cells) >= 4:
+            # Skip the first cell (checkbox or empty cell)
+            # Cell 1: Category/Type
+            category = cells[1].get_text(strip=True)
 
-            # Title and link (second column)
-            title_col = cols[1]
-            link_elem = title_col.find('a')
+            # Cell 2: Title and link
+            title_cell = cells[2]
+            link_elem = title_cell.find('a')
 
             if link_elem:
                 update['title'] = link_elem.get_text(strip=True)
                 href = link_elem.get('href', '')
                 update['link'] = urljoin(self.base_url, href)
             else:
-                update['title'] = title_col.get_text(strip=True)
+                update['title'] = title_cell.get_text(strip=True)
                 update['link'] = self.updates_url
 
-            # Date (third column)
-            date_text = cols[2].get_text(strip=True)
+            # Cell 3: Date
+            date_text = cells[3].get_text(strip=True)
             update['date'] = self.parse_date(date_text)
 
-            # Views (fourth column if exists)
-            if len(cols) >= 4:
-                views_text = cols[3].get_text(strip=True)
-                update['views'] = views_text.replace(',', '')
+            # Cell 4: Views (if exists)
+            if len(cells) >= 5:
+                views_text = cells[4].get_text(strip=True)
+                update['views'] = views_text.replace(',', '').replace('.', '')
 
             # Create description
             update['description'] = f"Category: {category}"
@@ -95,27 +96,35 @@ class KiaUpdateRSSGenerator:
         return update if update.get('title') else None
 
     def parse_date(self, date_str):
-        """Parse date in format like '09-Jul-2025'"""
+        """Parse date in various formats"""
         try:
-            # Handle the specific format from the website
-            return datetime.strptime(date_str, '%d-%b-%Y')
+            # Handle MM-DD-YYYY format (e.g., '12-15-2025')
+            if re.match(r'\d{2}-\d{2}-\d{4}', date_str):
+                return datetime.strptime(date_str, '%m-%d-%Y')
+            
+            # Handle DD-Mon-YYYY format (e.g., '09-Sep-2025')
+            if re.match(r'\d{2}-\w{3}-\d{4}', date_str):
+                return datetime.strptime(date_str, '%d-%b-%Y')
+                
         except ValueError:
-            # Try other common formats
-            date_formats = [
-                '%d-%m-%Y', '%d/%m/%Y', '%Y-%m-%d',
-                '%d.%m.%Y', '%Y.%m.%d', '%d %B %Y',
-                '%B %d, %Y', '%d %b %Y'
-            ]
+            pass
+            
+        # Try other common formats
+        date_formats = [
+            '%d-%m-%Y', '%d/%m/%Y', '%Y-%m-%d',
+            '%d.%m.%Y', '%Y.%m.%d', '%d %B %Y',
+            '%B %d, %Y', '%d %b %Y'
+        ]
 
-            for fmt in date_formats:
-                try:
-                    return datetime.strptime(date_str, fmt)
-                except ValueError:
-                    continue
+        for fmt in date_formats:
+            try:
+                return datetime.strptime(date_str, fmt)
+            except ValueError:
+                continue
 
-            # If no format matches, return current date
-            print(f"Could not parse date: {date_str}")
-            return datetime.now()
+        # If no format matches, return current date
+        print(f"Could not parse date: {date_str}")
+        return datetime.now()
 
     def create_rss_feed(self, updates):
         """Create RSS feed from updates"""
