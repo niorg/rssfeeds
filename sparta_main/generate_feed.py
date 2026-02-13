@@ -161,36 +161,46 @@ class SpartaRotterdamRSSGenerator:
 
     def create_rss_feed(self, articles):
         """Create RSS feed from articles"""
-        rss = ET.Element('rss', version='2.0')
-        rss.set('xmlns:atom', 'http://www.w3.org/2005/Atom')
-        channel = ET.SubElement(rss, 'channel')
-
+        from xml.sax.saxutils import escape
+        
+        # Build RSS feed manually to properly handle CDATA
+        rss_parts = ['<?xml version="1.0" encoding="UTF-8"?>']
+        rss_parts.append('<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">')
+        rss_parts.append('<channel>')
+        
         # Add channel metadata
-        ET.SubElement(channel, 'title').text = 'Sparta Rotterdam nieuws (onofficieel)'
-        ET.SubElement(channel, 'link').text = self.site_url
-        ET.SubElement(channel, 'description').text = 'Ongeofficieel RSS-nieuwsfeed voor Sparta Rotterdam'
-        ET.SubElement(channel, 'language').text = 'nl-NL'
-        ET.SubElement(channel, 'lastBuildDate').text = datetime.now().strftime('%a, %d %b %Y %H:%M:%S +0000')
-        ET.SubElement(channel, 'generator').text = 'Sparta Rotterdam RSS Generator'
+        rss_parts.append(f'<title>{escape("Sparta Rotterdam nieuws (onofficieel)")}</title>')
+        rss_parts.append(f'<link>{escape(self.site_url)}</link>')
+        rss_parts.append(f'<description>{escape("Ongeofficieel RSS-nieuwsfeed voor Sparta Rotterdam")}</description>')
+        rss_parts.append('<language>nl-NL</language>')
+        rss_parts.append(f'<lastBuildDate>{datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000")}</lastBuildDate>')
+        rss_parts.append('<generator>Sparta Rotterdam RSS Generator</generator>')
 
         # Add items
         for article in articles:
-            item = ET.SubElement(channel, 'item')
-            ET.SubElement(item, 'title').text = article['title']
-            ET.SubElement(item, 'link').text = article['link']
+            rss_parts.append('<item>')
+            rss_parts.append(f'<title>{escape(article["title"])}</title>')
+            rss_parts.append(f'<link>{escape(article["link"])}</link>')
             
-            # Use CDATA for description
-            desc = ET.SubElement(item, 'description')
-            desc.text = article['description']
+            # Use CDATA for description to preserve HTML
+            rss_parts.append(f'<description><![CDATA[{article["description"]}]]></description>')
             
             pub_date = article['pubDate']
-            ET.SubElement(item, 'pubDate').text = pub_date.strftime('%a, %d %b %Y %H:%M:%S +0100')
-            ET.SubElement(item, 'guid', isPermaLink='true').text = article['link']
+            rss_parts.append(f'<pubDate>{pub_date.strftime("%a, %d %b %Y %H:%M:%S +0100")}</pubDate>')
+            rss_parts.append(f'<guid isPermaLink="true">{escape(article["link"])}</guid>')
+            rss_parts.append('</item>')
 
-        # Pretty print XML
-        xml_str = ET.tostring(rss, encoding='unicode')
-        dom = minidom.parseString(xml_str)
-        return dom.toprettyxml(indent='  ')
+        rss_parts.append('</channel>')
+        rss_parts.append('</rss>')
+        
+        # Pretty print the XML
+        xml_str = '\n'.join(rss_parts)
+        try:
+            dom = minidom.parseString(xml_str)
+            return dom.toprettyxml(indent='  ')
+        except:
+            # If pretty printing fails, return as-is
+            return xml_str
 
     def save_rss_feed(self, rss_content, filename='sparta_rss.xml'):
         """Save RSS feed to file"""

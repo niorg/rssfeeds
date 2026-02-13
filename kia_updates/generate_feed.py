@@ -99,8 +99,13 @@ class KiaUpdateRSSGenerator:
         """Parse date in various formats"""
         try:
             # Handle MM-DD-YYYY format (e.g., '12-15-2025')
+            # Note: Kia website uses MM-DD-YYYY format (US style)
             if re.match(r'\d{2}-\d{2}-\d{4}', date_str):
-                return datetime.strptime(date_str, '%m-%d-%Y')
+                parts = date_str.split('-')
+                month, day, year = int(parts[0]), int(parts[1]), int(parts[2])
+                # Validate month is in valid range
+                if 1 <= month <= 12:
+                    return datetime.strptime(date_str, '%m-%d-%Y')
             
             # Handle DD-Mon-YYYY format (e.g., '09-Sep-2025')
             if re.match(r'\d{2}-\w{3}-\d{4}', date_str):
