@@ -1,5 +1,5 @@
 import cloudscraper
-import requests
+import requests  # cloudscraper is built on requests and raises requests exceptions
 from bs4 import BeautifulSoup
 from datetime import datetime
 import xml.etree.ElementTree as ET
