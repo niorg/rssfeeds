@@ -198,7 +198,7 @@ class SpartaRotterdamRSSGenerator:
         try:
             dom = minidom.parseString(xml_str)
             return dom.toprettyxml(indent='  ')
-        except:
+        except Exception:
             # If pretty printing fails, return as-is
             return xml_str
 
