@@ -96,8 +96,9 @@ class UIBlogRSSGenerator:
             
             ET.SubElement(item, 'description').text = description
             
-            # Publication date
-            pub_date_str = article.get('publishedAt') or article.get('createdAt')
+            # Publication date - use createdAt for original publication date
+            # publishedAt is frequently updated and doesn't represent the actual article date
+            pub_date_str = article.get('createdAt') or article.get('publishedAt')
             if pub_date_str:
                 pub_date = self.parse_date(pub_date_str)
                 ET.SubElement(item, 'pubDate').text = pub_date.strftime('%a, %d %b %Y %H:%M:%S +0000')
@@ -134,7 +135,7 @@ class UIBlogRSSGenerator:
 
         print(f"Found {len(articles)} articles:")
         for article in articles:
-            pub_date = article.get('publishedAt') or article.get('createdAt', '')
+            pub_date = article.get('createdAt') or article.get('publishedAt', '')
             pub_date_obj = self.parse_date(pub_date) if pub_date else datetime.now()
             print(f"  - {article.get('title', 'Untitled')} ({pub_date_obj.strftime('%Y-%m-%d')})")
 

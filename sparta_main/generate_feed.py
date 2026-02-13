@@ -1,4 +1,4 @@
-import requests
+import cloudscraper
 from bs4 import BeautifulSoup
 from datetime import datetime
 import xml.etree.ElementTree as ET
@@ -6,20 +6,24 @@ from xml.dom import minidom
 import re
 import time
 
+# Note: The Sparta Rotterdam website is protected by Cloudflare's advanced bot protection.
+# The cloudscraper library attempts to bypass basic Cloudflare protection, but may not work
+# with advanced JavaScript challenges. If this script fails with 403 errors, the website's
+# protection cannot be bypassed without using a full browser automation solution.
+
+
 class SpartaRotterdamRSSGenerator:
     def __init__(self):
         self.base_url = 'https://www.sparta-rotterdam.nl'
         self.site_url = f'{self.base_url}/'
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'DNT': '1',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-        }
-        self.session = requests.Session()
+        # Use cloudscraper to bypass Cloudflare protection
+        self.session = cloudscraper.create_scraper(
+            browser={
+                'browser': 'chrome',
+                'platform': 'windows',
+                'mobile': False
+            }
+        )
 
     def parse_nl_datetime(self, dt_str):
         """Parse '27 juni 2025 - 17:00' into datetime object."""
@@ -38,7 +42,7 @@ class SpartaRotterdamRSSGenerator:
     def fetch_articles(self):
         """Fetch articles from Sparta Rotterdam website"""
         try:
-            response = self.session.get(self.site_url, headers=self.headers, timeout=15)
+            response = self.session.get(self.site_url, timeout=30)
             response.raise_for_status()
             
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -63,15 +67,18 @@ class SpartaRotterdamRSSGenerator:
 
             return articles
             
-        except requests.HTTPError as e:
-            if e.response.status_code == 403:
-                print(f"Access denied (403 Forbidden). The website may be blocking automated requests.")
-                print(f"This is a limitation of the Sparta Rotterdam website's anti-bot protection.")
+        except Exception as e:
+            # Check if this is a Cloudflare protection issue
+            if '403' in str(e) or 'Forbidden' in str(e):
+                print(f"Access denied (403 Forbidden).")
+                print(f"The Sparta Rotterdam website is protected by Cloudflare's advanced bot protection.")
+                print(f"This protection cannot be bypassed with simple HTTP requests.")
+                print(f"\nPossible workarounds:")
+                print(f"  1. Use a browser extension to manually generate the RSS feed")
+                print(f"  2. Contact the website administrator to request an official RSS feed")
+                print(f"  3. Use a headless browser solution (Selenium/Playwright) with undetected-chromedriver")
             else:
-                print(f"HTTP error fetching articles: {e}")
-            return []
-        except requests.RequestException as e:
-            print(f"Error fetching articles: {e}")
+                print(f"Error fetching articles: {e}")
             return []
 
     def parse_article(self, art):
@@ -127,7 +134,7 @@ class SpartaRotterdamRSSGenerator:
     def fetch_article_details(self, url):
         """Visit the article URL and return (published_date, main_html_content)"""
         try:
-            resp = self.session.get(url, headers=self.headers, timeout=10)
+            resp = self.session.get(url, timeout=15)
             resp.raise_for_status()
             soup = BeautifulSoup(resp.text, 'html.parser')
 
@@ -234,5 +241,7 @@ if __name__ == "__main__":
         print("\nRSS feed generated successfully!")
     else:
         print("\nFailed to generate RSS feed.")
-        print("Note: The Sparta Rotterdam website may be blocking automated access.")
+        print("\nNote: If you're seeing 403 errors, this is due to Cloudflare protection.")
+        print("The website uses advanced bot detection that requires a full browser to bypass.")
+
 
