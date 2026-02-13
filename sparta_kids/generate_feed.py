@@ -1,4 +1,5 @@
 import cloudscraper
+import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 import xml.etree.ElementTree as ET
@@ -24,6 +25,15 @@ class SpartaKidsRSSGenerator:
                 'mobile': False
             }
         )
+
+    def print_cloudflare_error_message(self):
+        """Print informative error message about Cloudflare protection."""
+        print(f"The Sparta Rotterdam website is protected by Cloudflare's advanced bot protection.")
+        print(f"This protection cannot be bypassed with simple HTTP requests.")
+        print(f"\nPossible workarounds:")
+        print(f"  1. Use a browser extension to manually generate the RSS feed")
+        print(f"  2. Contact the website administrator to request an official RSS feed")
+        print(f"  3. Use a headless browser solution (Selenium/Playwright) with undetected-chromedriver")
 
     def parse_nl_datetime(self, dt_str):
         """Parse '27 juni 2025 - 17:00' into datetime object."""
@@ -69,26 +79,17 @@ class SpartaKidsRSSGenerator:
             
         except cloudscraper.exceptions.CloudflareChallengeError as e:
             print(f"Cloudflare challenge failed: {e}")
-            print(f"The Sparta Rotterdam website is protected by Cloudflare's advanced bot protection.")
-            print(f"This protection cannot be bypassed with simple HTTP requests.")
-            print(f"\nPossible workarounds:")
-            print(f"  1. Use a browser extension to manually generate the RSS feed")
-            print(f"  2. Contact the website administrator to request an official RSS feed")
-            print(f"  3. Use a headless browser solution (Selenium/Playwright) with undetected-chromedriver")
+            self.print_cloudflare_error_message()
+            return []
+        except requests.HTTPError as e:
+            if e.response.status_code == 403:
+                print(f"Access denied (403 Forbidden).")
+                self.print_cloudflare_error_message()
+            else:
+                print(f"HTTP error fetching articles: {e}")
             return []
         except Exception as e:
-            # Check if this is a 403 HTTP error
-            error_str = str(e)
-            if '403' in error_str or 'Forbidden' in error_str:
-                print(f"Access denied (403 Forbidden).")
-                print(f"The Sparta Rotterdam website is protected by Cloudflare's advanced bot protection.")
-                print(f"This protection cannot be bypassed with simple HTTP requests.")
-                print(f"\nPossible workarounds:")
-                print(f"  1. Use a browser extension to manually generate the RSS feed")
-                print(f"  2. Contact the website administrator to request an official RSS feed")
-                print(f"  3. Use a headless browser solution (Selenium/Playwright) with undetected-chromedriver")
-            else:
-                print(f"Error fetching articles: {e}")
+            print(f"Error fetching articles: {e}")
             return []
 
     def parse_article(self, art):
