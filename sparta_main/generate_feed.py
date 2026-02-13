@@ -28,12 +28,12 @@ class SpartaRotterdamRSSGenerator:
 
     def print_cloudflare_error_message(self):
         """Print informative error message about Cloudflare protection."""
-        print(f"The Sparta Rotterdam website is protected by Cloudflare's advanced bot protection.")
-        print(f"This protection cannot be bypassed with simple HTTP requests.")
-        print(f"\nPossible workarounds:")
-        print(f"  1. Use a browser extension to manually generate the RSS feed")
-        print(f"  2. Contact the website administrator to request an official RSS feed")
-        print(f"  3. Use a headless browser solution (Selenium/Playwright) with undetected-chromedriver")
+        print("The Sparta Rotterdam website is protected by Cloudflare's advanced bot protection.")
+        print("This protection cannot be bypassed with simple HTTP requests.")
+        print("\nPossible workarounds:")
+        print("  1. Use a browser extension to manually generate the RSS feed")
+        print("  2. Contact the website administrator to request an official RSS feed")
+        print("  3. Use a headless browser solution (Selenium/Playwright) with undetected-chromedriver")
 
     def parse_nl_datetime(self, dt_str):
         """Parse '27 juni 2025 - 17:00' into datetime object."""
@@ -83,12 +83,12 @@ class SpartaRotterdamRSSGenerator:
             return []
         except requests.HTTPError as e:
             if e.response.status_code == 403:
-                print(f"Access denied (403 Forbidden).")
+                print("Access denied (403 Forbidden).")
                 self.print_cloudflare_error_message()
             else:
                 print(f"HTTP error fetching articles: {e}")
             return []
-        except Exception as e:
+        except requests.RequestException as e:
             print(f"Error fetching articles: {e}")
             return []
 
