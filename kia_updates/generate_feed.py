@@ -35,69 +35,74 @@ class KiaUpdateRSSGenerator:
         soup = BeautifulSoup(html_content, 'html.parser')
         updates = []
 
-        # Find the table element (new site structure uses actual <table>)
-        table = soup.find('table')
+        # The site now uses a card/list layout: each update is an <a> linking to
+        # updateNoticeView, containing a category chip, title h3, date and view count.
+        update_links = soup.find_all('a', href=re.compile(r'/updateNoticeView/'))
 
-        if not table:
-            print("Could not find the table element")
+        if not update_links:
+            print("Could not find any update notice entries")
             return updates
 
-        # Find all update rows (skip the header row)
-        rows = table.find_all('tr')
-        
-        for row in rows[1:]:  # Skip header row
-            update = self.extract_update_info(row)
+        for link in update_links:
+            update = self.extract_update_info(link)
             if update:
                 updates.append(update)
 
         return updates
 
-    def extract_update_info(self, row):
-        """Extract information from a single update row"""
+    def extract_update_info(self, link):
+        """Extract information from a single update card (anchor element)"""
         update = {}
 
-        # Extract cells (th or td)
-        cells = row.find_all(['th', 'td'])
+        # Title from h3
+        h3 = link.find('h3')
+        if not h3:
+            return None
+        update['title'] = h3.get_text(strip=True)
 
-        if len(cells) >= 4:
-            # Skip the first cell (checkbox or empty cell)
-            # Cell 1: Category/Type
-            category = cells[1].get_text(strip=True)
+        # Link from href attribute
+        href = link.get('href', '')
+        update['link'] = urljoin(self.base_url, href) if href else self.updates_url
 
-            # Cell 2: Title and link
-            title_cell = cells[2]
-            link_elem = title_cell.find('a')
+        # Category from the chip/badge span
+        chip = link.find('span', class_=re.compile(r'\bchip\b'))
+        update['category'] = chip.get_text(strip=True) if chip else ''
 
-            if link_elem:
-                update['title'] = link_elem.get_text(strip=True)
-                href = link_elem.get('href', '')
-                update['link'] = urljoin(self.base_url, href)
+        # Date and view count from the meta div (grey text)
+        meta_div = link.find('div', class_=re.compile(r'\btext-grey-60\b'))
+        if meta_div:
+            spans = meta_div.find_all('span')
+            date_text = spans[0].get_text(strip=True) if spans else ''
+            if date_text:
+                update['date'] = self.parse_date(date_text)
             else:
-                update['title'] = title_cell.get_text(strip=True)
-                update['link'] = self.updates_url
+                print(f"Warning: no date found for update '{update.get('title', '')}'")
+                update['date'] = datetime.now()
 
-            # Cell 3: Date
-            date_text = cells[3].get_text(strip=True)
-            update['date'] = self.parse_date(date_text)
+            if len(spans) > 1:
+                views_raw = spans[1].get_text(strip=True)
+                # Strip any localized "views" label prefix (e.g. "Weergaven29,496" → "29,496")
+                # before extracting the numeric view count
+                views_clean = re.sub(r'^[^\d]+', '', views_raw)
+                update['views'] = views_clean.replace(',', '').replace('.', '')
+        else:
+            print(f"Warning: no metadata div found for update '{update.get('title', '')}'")
+            update['date'] = datetime.now()
 
-            # Cell 4: Views (if exists)
-            if len(cells) >= 5:
-                views_text = cells[4].get_text(strip=True)
-                update['views'] = views_text.replace(',', '').replace('.', '')
+        # Build description
+        update['description'] = f"Category: {update.get('category', '')}"
+        if 'views' in update:
+            update['description'] += f" | Views: {update['views']}"
 
-            # Create description
-            update['description'] = f"Category: {category}"
-            if 'views' in update:
-                update['description'] += f" | Views: {update['views']}"
-
-            # Add category as a separate field for RSS categories
-            update['category'] = category
-
-        return update if update.get('title') else None
+        return update
 
     def parse_date(self, date_str):
         """Parse date in various formats"""
         try:
+            # Handle YYYY-MM-DD format (ISO 8601, current site format)
+            if re.match(r'\d{4}-\d{2}-\d{2}$', date_str):
+                return datetime.strptime(date_str, '%Y-%m-%d')
+
             # Handle MM-DD-YYYY format (e.g., '12-15-2025')
             # Note: Kia website uses MM-DD-YYYY format (US style)
             if re.match(r'\d{2}-\d{2}-\d{4}', date_str):

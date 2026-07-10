@@ -22,18 +22,6 @@ jobs:
       uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
     - name: Generate RSS feed
-      working-directory: sparta_main
-      run: |
-        pip install -r requirements.txt
-        python generate_feed.py
- 
-    - name: Generate RSS feed
-      working-directory: sparta_kids
-      run: |
-        pip install -r requirements.txt
-        python generate_feed.py
-
-    - name: Generate RSS feed
       working-directory: kia_updates
       run: |
         pip install -r requirements.txt
